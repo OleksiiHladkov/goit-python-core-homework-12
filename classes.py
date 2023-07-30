@@ -179,7 +179,7 @@ class AdressBook(UserDict):
                 yield result
                 result = get_new_table()
 
-    def show_all(self) -> list[Table]:
+    def show_all(self) -> list[Table]|str:
         result = []
         generator = self.iterator(PAGINATION)
         for i in generator:
@@ -219,7 +219,7 @@ class AdressBook(UserDict):
 
                 self.add_record(record)
 
-    def find(self, search:str):
+    def find(self, search:str) -> list[Table]|str:
         ab = AdressBook()
         for record in self.data.values():
             if search in str(record.name) or search in str(record.phones):
