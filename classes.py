@@ -1,10 +1,13 @@
+import pickle
 import re
 from collections import UserDict
 from datetime import datetime, timedelta
+from pathlib import Path
 from rich.table import Table
 
 
 PAGINATION = 4
+DATA_PATH = "./base.bin"
 
 
 class Field:
@@ -102,7 +105,7 @@ class Record:
         return separeter.join(str(p) for p in self.phones)
 
     def days_to_birthday(self) -> int|None:
-        if self.birthday.value == self.birthday.is_empty_date():
+        if self.birthday.is_empty_date():
             return None
         
         date_now = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -160,7 +163,17 @@ class AdressBook(UserDict):
         for name, record in self.data.items():
             count += 1
             
-            result.add_row(str(name), record.show_phones("\n"), str(record.birthday), str(record.days_to_birthday()))
+            days = record.days_to_birthday()
+            days_str = ""
+            
+            if days == 0:
+                days_str = "Today"
+            elif days:
+                days_str = str(days)
+            else:
+                days_str = ""
+
+            result.add_row(str(name), record.show_phones("\n"), str(record.birthday), days_str)
             
             if not count % pagination or len(self.data.keys()) == count:
                 yield result
@@ -172,4 +185,52 @@ class AdressBook(UserDict):
         for i in generator:
             result.append(i)
         
-        return result
+        if len(result):
+            return result
+        else:
+            return "Can't find records in adressbook!"
+    
+    def write_data(self):
+        data = {}
+
+        for key, value in self.items():
+            data[key] = {"phones": [str(p) for p in value.phones], "birthday": "" if value.birthday.is_empty_date() else str(value.birthday)}
+
+        with open(DATA_PATH, "wb") as fh:
+            pickle.dump(data, fh)
+
+    def read_data(self):
+        if Path(DATA_PATH).exists():
+            self.clear()
+            
+            with open(DATA_PATH, "rb") as fh:
+                unpacked = pickle.load(fh)
+
+            for key, value in unpacked.items():
+                birthday = value["birthday"]
+                
+                if birthday:
+                    record = Record(name=Name(key), birthday=Birthday(birthday))
+                else:
+                    record = Record(name=Name(key))
+
+                for phone in value["phones"]:
+                    record.add_phone(phone)
+
+                self.add_record(record)
+
+    def find(self, search:str):
+        ab = AdressBook()
+        for record in self.data.values():
+            if search in str(record.name) or search in str(record.phones):
+                ab.add_record(record)
+        
+        return ab.show_all()
+
+
+class SerializingError(pickle.PicklingError):
+    pass
+
+
+class DataError(pickle.PickleError):
+    pass

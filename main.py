@@ -1,4 +1,4 @@
-from classes import Name, PhoneError, Phone, BirthdayError, Birthday, Record, AdressBook, Table
+from classes import Name, PhoneError, Phone, BirthdayError, Birthday, Record, AdressBook, SerializingError, DataError, Table
 from rich import print
 
 
@@ -43,13 +43,22 @@ def parcing_data(value:str) -> dict:
 def input_error(handler_func):
     def inner_func(**kwargs):
         try:
+            # run command
             result = handler_func(**kwargs)
+            
+            # write data
+            if kwargs["command"] in ("add", "change", "delete"):
+                adressbook.write_data()
         except KeyError as key:
             result = f"Name {key} is not found" if not str(key) in ("'name'", "'phone'") else f"You must enter {key}"
         except BirthdayError:
             result = "Date of birth must be one of the formats: '%d-%m-%Y', '%d.%m.%Y', '%d/%m/%Y'"
         except PhoneError:
             result = "Phone number must be in format '+\[country]\[town]\[number]'. Examples: '+380661234567' or '+442012345678'"
+        except SerializingError:
+            result = "Can't serializing data! Something go wrong!"
+        except DataError:
+            result = "Can't write data file! Something go wrong!"
         
         return result
     return inner_func
@@ -109,6 +118,12 @@ def command_phone(**kwargs) -> str:
 def command_show_all(**kwargs) -> Table:
     return adressbook.show_all()
 
+@input_error
+def command_find(**kwargs) -> str:
+    # use second parameter (first after "command"), it is not necessarily a name
+    search = kwargs["name"]
+    return adressbook.find(search)
+
 
 def command_exit(**kwargs) -> str:
     return "Good bye!"
@@ -120,9 +135,10 @@ COMMANDS = {"hello": command_hello,
             "delete": command_delete,
             "phone": command_phone,
             "show all": command_show_all,
+            "find": command_find,
             "good bye": command_exit,
             "close": command_exit,
-            "exit": command_exit,}
+            "exit": command_exit}
 
 
 def get_handler(command:str):
@@ -130,6 +146,8 @@ def get_handler(command:str):
 
 
 def main():
+    adressbook.read_data()
+    
     while True:
         user_input = input("Enter command: ")
         
